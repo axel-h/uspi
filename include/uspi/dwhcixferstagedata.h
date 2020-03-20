@@ -60,7 +60,9 @@ typedef struct TDWHCITransferStageData
 	unsigned	 m_nSubState;
 	u32		 m_nTransactionStatus;
 
-	u32		 m_TempBuffer ALIGN (4);	// DMA buffer
+	// Since this is a DMA buffer we have to allocate it 
+	// using camkes functions => can't be an array struct member
+	u32*		 m_TempBuffer;				// DMA buffer
 	void		*m_pBufferPointer;
 
 	boolean		 m_bFrameSchedulerUsed;

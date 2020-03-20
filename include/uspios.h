@@ -101,10 +101,11 @@ int GetMACAddress (unsigned char Buffer[6]);	// "get board MAC address"
 //
 
 // Severity (change this before building if you want different values)
-#define LOG_ERROR	1
-#define LOG_WARNING	2
-#define LOG_NOTICE	3
-#define LOG_DEBUG	4
+// Renamed so it does not clash with other (system) error codes
+#define USPI_LOG_ERROR		1
+#define USPI_LOG_WARNING	2
+#define USPI_LOG_NOTICE		3
+#define USPI_LOG_DEBUG		4
 
 void LogWrite (const char *pSource,		// short name of module
 	       unsigned	   Severity,		// see above

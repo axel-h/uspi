@@ -24,13 +24,7 @@
 extern "C" {
 #endif
 
-#ifdef NDEBUG
-	#define assert(expr)	((void) 0)
-#else
-	void uspi_assertion_failed (const char *pExpr, const char *pFile, unsigned nLine);
-
-	#define assert(expr)	((expr)	? ((void) 0) : uspi_assertion_failed (#expr, __FILE__, __LINE__))
-#endif
+#include <utils/util.h>
 
 #ifdef __cplusplus
 }

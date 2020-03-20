@@ -22,6 +22,9 @@
 
 #include <uspios.h>
 
+extern unsigned long usb_host_controller_base_paddr;
+
+
 #if RASPPI == 1
 #define ARM_IO_BASE		0x20000000
 #else
@@ -50,7 +53,7 @@
 //
 // USB Host Controller
 //
-#define ARM_USB_BASE		(ARM_IO_BASE + 0x980000)
+#define ARM_USB_BASE 		(usb_host_controller_base_paddr)
 
 #define ARM_USB_CORE_BASE	ARM_USB_BASE
 #define ARM_USB_HOST_BASE	(ARM_USB_BASE + 0x400)

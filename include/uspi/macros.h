@@ -20,8 +20,8 @@
 #ifndef _uspi_macros_h
 #define _uspi_macros_h
 
-#define PACKED		__attribute__ ((packed))
-#define	ALIGN(n)	__attribute__ ((aligned (n)))
+#include <utils/util.h>
+
 #define NOOPT		__attribute__ ((optimize (0)))
 #define MAXOPT		__attribute__ ((optimize (3)))
 

@@ -30,6 +30,8 @@ extern "C" {
 // Version information
 //
 
+#include <uspi/types.h>
+
 #define USPI_NAME			"USPi library"
 
 #define USPI_MAJOR_VERSION		2
