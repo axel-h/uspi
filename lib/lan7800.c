@@ -254,7 +254,8 @@ void LAN7800Device (TLAN7800Device *pThis, TUSBFunction *pFunction)
 	pThis->m_pEndpointBulkOut = 0;
 	pThis->m_pTxBuffer = 0;
 
-	pThis->m_pTxBuffer = malloc (FRAME_BUFFER_SIZE);
+	//pThis->m_pTxBuffer = malloc (FRAME_BUFFER_SIZE);
+	pThis->m_pTxBuffer = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pTxBuffer != 0);
 }
 
@@ -264,21 +265,24 @@ void _LAN7800Device (TLAN7800Device *pThis)
 
 	if (pThis->m_pTxBuffer != 0)
 	{
-		free (pThis->m_pTxBuffer);
+		//free (pThis->m_pTxBuffer);
+		dma_free(pThis->m_pTxBuffer, DMA_ALIGNEMENT);
 		pThis->m_pTxBuffer = 0;
 	}
 
 	if (pThis->m_pEndpointBulkOut != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointBulkOut);
-		free (pThis->m_pEndpointBulkOut);
+		//free (pThis->m_pEndpointBulkOut);
+		dma_free(pThis->m_pEndpointBulkOut, DMA_ALIGNEMENT);
 		pThis->m_pEndpointBulkOut = 0;
 	}
 
 	if (pThis->m_pEndpointBulkIn != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointBulkIn);
-		free (pThis->m_pEndpointBulkIn);
+		//free (pThis->m_pEndpointBulkIn);
+		dma_free(pThis->m_pEndpointBulkIn, DMA_ALIGNEMENT);
 		pThis->m_pEndpointBulkIn = 0;
 	}
 
@@ -296,12 +300,24 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	{
 		USBFunctionConfigurationError (&pThis->m_USBFunction, FromLAN7800);
 
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "USBFunctionConfigurationError num of endpoints");
 		return FALSE;
 	}
+
+	// If we use just the pointer returned from USBFunctionGetDescriptor
+	// to access struct members (inside USBEndpoint2 function)
+	// we get a data fault
+	// possible reason	=>	using dma_alloc to allocate the memory
+	//						for the struct which maybe has some limitation an using that memory
+	// quick fix 		=> 	we declare a temp variable usbEndpointDesc and memcpy the content
+	//						returned by USBFunctionGetDescriptor to it
+	TUSBEndpointDescriptor usbEndpointDesc;
+	void* usbEndpointDescPtr = &usbEndpointDesc;
 
 	const TUSBEndpointDescriptor *pEndpointDesc;
 	while ((pEndpointDesc = (TUSBEndpointDescriptor *) USBFunctionGetDescriptor (&pThis->m_USBFunction, DESCRIPTOR_ENDPOINT)) != 0)
 	{
+		memcpy(usbEndpointDescPtr, pEndpointDesc, sizeof(usbEndpointDesc));
 		if ((pEndpointDesc->bmAttributes & 0x3F) == 0x02)		// Bulk
 		{
 			if ((pEndpointDesc->bEndpointAddress & 0x80) == 0x80)	// Input
@@ -310,12 +326,14 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 				{
 					USBFunctionConfigurationError (&pThis->m_USBFunction, FromLAN7800);
 
+					LogWrite (FromLAN7800, USPI_LOG_ERROR, "USBFunctionConfigurationError input");
 					return FALSE;
 				}
 
-				pThis->m_pEndpointBulkIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				//pThis->m_pEndpointBulkIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				pThis->m_pEndpointBulkIn = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 				assert (pThis->m_pEndpointBulkIn);
-				USBEndpoint2 (pThis->m_pEndpointBulkIn, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
+				USBEndpoint2 (pThis->m_pEndpointBulkIn, USBFunctionGetDevice (&pThis->m_USBFunction), &usbEndpointDesc);
 			}
 			else							// Output
 			{
@@ -323,12 +341,14 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 				{
 					USBFunctionConfigurationError (&pThis->m_USBFunction, FromLAN7800);
 
+					LogWrite (FromLAN7800, USPI_LOG_ERROR, "USBFunctionConfigurationError output");
 					return FALSE;
 				}
 
-				pThis->m_pEndpointBulkOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				//pThis->m_pEndpointBulkOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				pThis->m_pEndpointBulkOut = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 				assert (pThis->m_pEndpointBulkOut);
-				USBEndpoint2 (pThis->m_pEndpointBulkOut, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
+				USBEndpoint2 (pThis->m_pEndpointBulkOut, USBFunctionGetDevice (&pThis->m_USBFunction), &usbEndpointDesc);
 			}
 		}
 	}
@@ -343,20 +363,19 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 
 	if (!USBFunctionConfigure (&pThis->m_USBFunction))
 	{
-		LogWrite (FromLAN7800, LOG_ERROR, "Cannot set interface");
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Cannot set interface");
 
 		return FALSE;
 	}
 
 	// check chip ID
 
-	u32 nValue;
-	if (   !LAN7800DeviceReadReg (pThis, ID_REV, &nValue)
-	    || (nValue & ID_REV_CHIP_ID_MASK) >> 16 != ID_REV_CHIP_ID_7800)
+	u32* nValue = (u32*)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
+	if (   !LAN7800DeviceReadReg (pThis, ID_REV, nValue)
+	    || (*nValue & ID_REV_CHIP_ID_MASK) >> 16 != ID_REV_CHIP_ID_7800)
 	{
-		LogWrite (FromLAN7800, LOG_ERROR, "Invalid chip ID (0x%X)",
-					(nValue & ID_REV_CHIP_ID_MASK) >> 16);
-
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Invalid chip ID (0x%X)",
+					(*nValue & ID_REV_CHIP_ID_MASK) >> 16);
 		return FALSE;
 	}
 
@@ -366,14 +385,14 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceReadWriteReg (pThis, HW_CFG, HW_CFG_LRST, ~0U)
 	    || !LAN7800DeviceWaitReg (pThis, HW_CFG, HW_CFG_LRST, 0))
 	{
-		LogWrite (FromLAN7800, LOG_ERROR, "HW reset failed");
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "HW reset failed");
 
 		return FALSE;
 	}
 
 	if (!LAN7800DeviceInitMACAddress (pThis))
 	{
-		LogWrite (FromLAN7800, LOG_ERROR, "Cannot init MAC address");
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Cannot init MAC address");
 
 		return FALSE;
 	}
@@ -382,18 +401,21 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceWriteReg (pThis, BURST_CAP, DEFAULT_BURST_CAP_SIZE / HS_USB_PKT_SIZE)
 	    || !LAN7800DeviceWriteReg (pThis, BULK_IN_DLY, DEFAULT_BULK_IN_DELAY))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "USB high speed failed");
 		return FALSE;
 	}
 
 	// enable the LEDs and SEF mode
 	if (!LAN7800DeviceReadWriteReg (pThis, HW_CFG, HW_CFG_LED0_EN | HW_CFG_LED1_EN, ~HW_CFG_MEF))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Enable the LEDs and SEF mode failed");
 		return FALSE;
 	}
 
 	// enable burst CAP, disable NAK on RX FIFO empty
 	if (!LAN7800DeviceReadWriteReg (pThis, USB_CFG0, USB_CFG_BCE, ~USB_CFG_BIR))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Enable burst CAP, disable NAK on RX FIFO empty failed");
 		return FALSE;
 	}
 
@@ -401,6 +423,7 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceWriteReg (pThis, FCT_RX_FIFO_END, (MAX_RX_FIFO_SIZE - 512) / 512)
 	    || !LAN7800DeviceWriteReg (pThis, FCT_TX_FIFO_END, (MAX_TX_FIFO_SIZE - 512) / 512))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Set FIFO sizes failed");
 		return FALSE;
 	}
 
@@ -408,6 +431,7 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceWriteReg (pThis, INT_EP_CTL, 0)
 	    || !LAN7800DeviceWriteReg (pThis, INT_STS, INT_STS_CLEAR_ALL))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Interrupt EP is not used failed");
 		return FALSE;
 	}
 
@@ -415,12 +439,14 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceWriteReg (pThis, FLOW, 0)
 	    || !LAN7800DeviceWriteReg (pThis, FCT_FLOW, 0))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Disable flow control failed");
 		return FALSE;
 	}
 
 	// init receive filtering engine
 	if (!LAN7800DeviceReadWriteReg (pThis, RFE_CTL, RFE_CTL_BCAST_EN | RFE_CTL_DA_PERFECT, ~0U))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Init receive filtering engine failed");
 		return FALSE;
 	}
 
@@ -428,7 +454,7 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceReadWriteReg (pThis, PMT_CTL, PMT_CTL_PHY_RST, ~0U)
 	    || !LAN7800DeviceWaitReg (pThis, PMT_CTL, PMT_CTL_PHY_RST | PMT_CTL_READY, PMT_CTL_READY))
 	{
-		LogWrite (FromLAN7800, LOG_ERROR, "PHY reset failed");
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "PHY reset failed");
 
 		return FALSE;
 	}
@@ -436,6 +462,7 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	// enable AUTO negotiation
 	if (!LAN7800DeviceReadWriteReg (pThis, MAC_CR, MAC_CR_AUTO_DUPLEX | MAC_CR_AUTO_SPEED, ~0U))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Enable AUTO negotiation failed");
 		return FALSE;
 	}
 
@@ -443,6 +470,7 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !LAN7800DeviceReadWriteReg (pThis, MAC_TX, MAC_TX_TXEN, ~0U)
 	    || !LAN7800DeviceReadWriteReg (pThis, FCT_TX_CTL, FCT_TX_CTL_EN, ~0U))
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Enable TX failed");
 		return FALSE;
 	}
 
@@ -453,12 +481,13 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	    || !LAN7800DeviceReadWriteReg (pThis, FCT_RX_CTL, FCT_RX_CTL_EN, ~0U))
 
 	{
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Enable RX failed");
 		return FALSE;
 	}
 
 	if (!LAN7800DeviceInitPHY (pThis))
 	{
-		LogWrite (FromLAN7800, LOG_ERROR, "Cannot init PHY");
+		LogWrite (FromLAN7800, USPI_LOG_ERROR, "Cannot init PHY");
 
 		return FALSE;
 	}
@@ -469,6 +498,7 @@ boolean LAN7800DeviceConfigure (TUSBFunction *pUSBFunction)
 	DeviceNameServiceAddDevice (DeviceNameServiceGet (), StringGet (&DeviceName), pThis, FALSE);
 
 	_String (&DeviceName);
+	dma_free(nValue, DMA_ALIGNEMENT);
 
 	return TRUE;
 }
@@ -528,7 +558,7 @@ boolean LAN7800DeviceReceiveFrame (TLAN7800Device *pThis, void *pBuffer, unsigne
 	u32 nRxStatus = *(u32 *) pBuffer;	// RX command A
 	if (nRxStatus & RX_CMD_A_RED)
 	{
-		LogWrite (FromLAN7800, LOG_WARNING, "RX error (status 0x%X)", nRxStatus);
+		LogWrite (FromLAN7800, USPI_LOG_WARNING, "RX error (status 0x%X)", nRxStatus);
 
 		_USBRequest (&URB);
 
@@ -546,7 +576,7 @@ boolean LAN7800DeviceReceiveFrame (TLAN7800Device *pThis, void *pBuffer, unsigne
 	}
 	nFrameLength -= 4;	// ignore FCS
 
-	//LogWrite (FromLAN7800, LOG_DEBUG, "Frame received (status 0x%X)", nRxStatus);
+	//LogWrite (FromLAN7800, USPI_LOG_DEBUG, "Frame received (status 0x%X)", nRxStatus);
 
 	memcpy (pBuffer, (u8 *) pBuffer + RX_HEADER_SIZE, nFrameLength); // overwrite RX command A..C
 
@@ -606,7 +636,7 @@ boolean LAN7800DeviceInitMACAddress (TLAN7800Device *pThis)
 	TString MACString;
 	String (&MACString);
 	MACAddressFormat (&pThis->m_MACAddress, &MACString);
-	LogWrite (FromLAN7800, LOG_DEBUG, "MAC address is %s", StringGet (&MACString));
+	LogWrite (FromLAN7800, USPI_LOG_DEBUG, "MAC address is %s", StringGet (&MACString));
 
 	_String (&MACString);
 
@@ -676,16 +706,19 @@ boolean LAN7800DevicePHYRead (TLAN7800Device *pThis, u8 uchIndex, u16 *pValue)
 	    nMIIAccess |= ((u32) uchIndex << MII_ACC_MIIRINDA_SHIFT) & MII_ACC_MIIRINDA_MASK;
 	    nMIIAccess |= MII_ACC_MII_READ | MII_ACC_MII_BUSY;
 
-	u32 nValue;
+	// u32 nValue;
+	u32* nValue = (u32*)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	if (   !LAN7800DeviceWriteReg (pThis, MII_ACC, nMIIAccess)
 	    || !LAN7800DeviceWaitReg (pThis, MII_ACC, MII_ACC_MII_BUSY, 0)
-	    || !LAN7800DeviceReadReg (pThis, MII_DATA, &nValue))
+	    || !LAN7800DeviceReadReg (pThis, MII_DATA, nValue))
 	{
 		return FALSE;
 	}
 
 	assert (pValue != 0);
-	*pValue = nValue & MII_DATA_MASK;
+	*pValue = *nValue & MII_DATA_MASK;
+
+	dma_free(nValue, DMA_ALIGNEMENT);
 
 	return TRUE;
 }
@@ -697,7 +730,8 @@ boolean LAN7800DeviceWaitReg (TLAN7800Device *pThis, u32 nIndex, u32 nMask, u32 
 	assert (pThis != 0);
 
 	unsigned nTries = 1000;
-	u32 nValue;
+	// u32 nValue;
+	u32* nValue = (u32*)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	do
 	{
 		MsDelay (1);
@@ -707,12 +741,14 @@ boolean LAN7800DeviceWaitReg (TLAN7800Device *pThis, u32 nIndex, u32 nMask, u32 
 			return FALSE;
 		}
 
-		if (!LAN7800DeviceReadReg (pThis, nIndex, &nValue))
+		if (!LAN7800DeviceReadReg (pThis, nIndex, nValue))
 		{
 			return FALSE;
 		}
 	}
-	while ((nValue & nMask) != nCompare);
+	while ((*nValue & nMask) != nCompare);
+
+	dma_free(nValue, DMA_ALIGNEMENT);
 
 	return TRUE;
 }
@@ -721,32 +757,42 @@ boolean LAN7800DeviceReadWriteReg (TLAN7800Device *pThis, u32 nIndex, u32 nOrMas
 {
 	assert (pThis != 0);
 
-	u32 nValue;
-	if (!LAN7800DeviceReadReg (pThis, nIndex, &nValue))
+	// u32 nValue;
+	u32* nValue = (u32*)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
+	if (!LAN7800DeviceReadReg (pThis, nIndex, nValue))
 	{
 		return FALSE;
 	}
 
-	nValue &= nAndMask;
-	nValue |= nOrMask;
+	*nValue &= nAndMask;
+	*nValue |= nOrMask;
 
-	return LAN7800DeviceWriteReg (pThis, nIndex, nValue);
+	boolean ret = LAN7800DeviceWriteReg (pThis, nIndex, *nValue);
+	dma_free(nValue, DMA_ALIGNEMENT);
+
+	return ret;
 }
 
 boolean LAN7800DeviceWriteReg (TLAN7800Device *pThis, u32 nIndex, u32 nValue)
 {
 	assert (pThis != 0);
 
+	// If we just pass &nValue to the DWHCIDeviceControlMessage function
+	// It breaks since it expects a DMA address alligned to PAGE_SIZE
+	u32* value = (u32*)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
+	*value = nValue;
+
 	if (DWHCIDeviceControlMessage (USBFunctionGetHost (&pThis->m_USBFunction),
 				       USBFunctionGetEndpoint0 (&pThis->m_USBFunction),
 				       REQUEST_OUT | REQUEST_VENDOR, WRITE_REGISTER,
-				       0, nIndex, &nValue, sizeof nValue) < 0)
+				       0, nIndex, value, sizeof nValue) < 0)
 	{
-		LogWrite (FromLAN7800, LOG_WARNING, "Cannot write register 0x%X", nIndex);
-
+		LogWrite (FromLAN7800, USPI_LOG_WARNING, "Cannot write register 0x%X", nIndex);
+		dma_free(value, DMA_ALIGNEMENT);
 		return FALSE;
 	}
 
+	dma_free(value, DMA_ALIGNEMENT);
 	return TRUE;
 }
 
@@ -759,7 +805,7 @@ boolean LAN7800DeviceReadReg (TLAN7800Device *pThis, u32 nIndex, u32 *pValue)
 				       REQUEST_IN | REQUEST_VENDOR, READ_REGISTER,
 				       0, nIndex, pValue, sizeof *pValue) != (int) sizeof *pValue)
 	{
-		LogWrite (FromLAN7800, LOG_WARNING, "Cannot read register 0x%X", nIndex);
+		LogWrite (FromLAN7800, USPI_LOG_WARNING, "Cannot read register 0x%X", nIndex);
 
 		return FALSE;
 	}

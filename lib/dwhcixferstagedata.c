@@ -86,7 +86,7 @@ void DWHCITransferStageData (TDWHCITransferStageData *pThis, unsigned nChannel, 
 	}
 	else
 	{
-		pThis->m_pBufferPointer = &pThis->m_TempBuffer;
+		pThis->m_pBufferPointer = pThis->m_TempBuffer;
 
 		pThis->m_nTransferSize = 0;
 		pThis->m_nBytesPerTransaction = 0;
@@ -146,7 +146,7 @@ void DWHCITransferStageDataTransactionComplete (TDWHCITransferStageData *pThis, 
 #if 0
 	if (pThis->m_bSplitTransaction)
 	{
-		Logger->Write ("udata", LOG_DEBUG,
+		Logger->Write ("udata", USPI_LOG_DEBUG,
 			       "Transaction complete (status 0x%X, packets 0x%X, bytes 0x%X)",
 			       nStatus, nPacketsLeft, nBytesLeft);
 	}

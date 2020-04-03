@@ -43,7 +43,8 @@ void _DWHCIRootPort (TDWHCIRootPort *pThis)
 	if (pThis->m_pDevice != 0)
 	{
 		_USBDevice (pThis->m_pDevice);
-		free (pThis->m_pDevice);
+		//free (pThis->m_pDevice);
+		dma_free(pThis->m_pDevice, DMA_ALIGNEMENT);
 		pThis->m_pDevice = 0;
 	}
 
@@ -58,21 +59,24 @@ boolean DWHCIRootPortInitialize (TDWHCIRootPort *pThis)
 	TUSBSpeed Speed = DWHCIDeviceGetPortSpeed (pThis->m_pHost);
 	if (Speed == USBSpeedUnknown)
 	{
-		LogWrite (FromDWHCIRoot, LOG_ERROR, "Cannot detect port speed");
+		LogWrite (FromDWHCIRoot, USPI_LOG_ERROR, "Cannot detect port speed");
 
 		return FALSE;
 	}
 	
 	// first create default device
 	assert (pThis->m_pDevice == 0);
-	pThis->m_pDevice = (TUSBDevice *) malloc (sizeof (TUSBDevice));
+	//pThis->m_pDevice = (TUSBDevice *) malloc (sizeof (TUSBDevice));
+	pThis->m_pDevice = (TUSBDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
+
 	assert (pThis->m_pDevice != 0);
 	USBDevice (pThis->m_pDevice, pThis->m_pHost, Speed, FALSE, 0, 1);
 
 	if (!USBDeviceInitialize (pThis->m_pDevice))
 	{
 		_USBDevice (pThis->m_pDevice);
-		free (pThis->m_pDevice);
+		//free (pThis->m_pDevice);
+		dma_free(pThis->m_pDevice, DMA_ALIGNEMENT);
 		pThis->m_pDevice = 0;
 
 		return FALSE;
@@ -80,26 +84,28 @@ boolean DWHCIRootPortInitialize (TDWHCIRootPort *pThis)
 
 	if (!USBDeviceConfigure (pThis->m_pDevice))
 	{
-		LogWrite (FromDWHCIRoot, LOG_ERROR, "Cannot configure device");
+		LogWrite (FromDWHCIRoot, USPI_LOG_ERROR, "Cannot configure device");
 
 		_USBDevice (pThis->m_pDevice);
-		free (pThis->m_pDevice);
+		//free (pThis->m_pDevice);
+		dma_free(pThis->m_pDevice, DMA_ALIGNEMENT);
 		pThis->m_pDevice = 0;
 
 		return FALSE;
 	}
 
-	LogWrite (FromDWHCIRoot, LOG_DEBUG, "Device configured");
+	LogWrite (FromDWHCIRoot, USPI_LOG_DEBUG, "Device configured");
 
 	// check for over-current
 	if (DWHCIDeviceOvercurrentDetected (pThis->m_pHost))
 	{
-		LogWrite (FromDWHCIRoot, LOG_ERROR, "Over-current condition");
+		LogWrite (FromDWHCIRoot, USPI_LOG_ERROR, "Over-current condition");
 
 		DWHCIDeviceDisableRootPort (pThis->m_pHost);
 
 		_USBDevice (pThis->m_pDevice);
-		free (pThis->m_pDevice);
+		//free (pThis->m_pDevice);
+		dma_free(pThis->m_pDevice, DMA_ALIGNEMENT);
 		pThis->m_pDevice = 0;
 
 		return FALSE;

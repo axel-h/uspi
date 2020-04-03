@@ -144,7 +144,7 @@ void DWHCIFrameSchedulerPeriodicTransactionComplete (TDWHCIFrameScheduler *pBase
 		}
 		else
 		{
-			LogWrite ("dwsched", LOG_ERROR, "Invalid status 0x%X", nStatus);
+			LogWrite ("dwsched", USPI_LOG_ERROR, "Invalid status 0x%X", nStatus);
 			assert (0);
 		}
 		break;

@@ -59,14 +59,16 @@ void _CUSBMIDIDevice (TUSBMIDIDevice *pThis)
 
 	if (pThis->m_pPacketBuffer != 0)
 	{
-		free (pThis->m_pPacketBuffer);
+		//free (pThis->m_pPacketBuffer);
+		dma_free(pThis->m_pPacketBuffer, DMA_ALIGNEMENT);
 		pThis->m_pPacketBuffer = 0;
 	}
 
 	if (pThis->m_pEndpointIn != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointIn);
-		free (pThis->m_pEndpointIn);
+		//free (pThis->m_pEndpointIn);
+		dma_free(pThis->m_pEndpointIn, DMA_ALIGNEMENT),
 		pThis->m_pEndpointIn = 0;
 	}
 
@@ -110,13 +112,15 @@ boolean USBMIDIDeviceConfigure (TUSBFunction *pUSBFunction)
 		}
 
 		assert (pThis->m_pEndpointIn == 0);
-		pThis->m_pEndpointIn = malloc (sizeof (TUSBEndpoint));
+		//pThis->m_pEndpointIn = malloc (sizeof (TUSBEndpoint));
+		pThis->m_pEndpointIn = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pThis->m_pEndpointIn != 0);
 
 		pThis->m_usBufferSize = pEndpointDesc->wMaxPacketSize;
 		pThis->m_usBufferSize -= pEndpointDesc->wMaxPacketSize % EVENT_PACKET_SIZE;
 		assert (pThis->m_pPacketBuffer == 0);
-		pThis->m_pPacketBuffer = malloc (pThis->m_usBufferSize);
+		//pThis->m_pPacketBuffer = malloc (pThis->m_usBufferSize);
+		pThis->m_pPacketBuffer = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pThis->m_pPacketBuffer != 0);
 
 		USBEndpoint2 (pThis->m_pEndpointIn, USBFunctionGetDevice (&pThis->m_USBFunction), (TUSBEndpointDescriptor *) pEndpointDesc);
@@ -131,7 +135,7 @@ boolean USBMIDIDeviceConfigure (TUSBFunction *pUSBFunction)
 
 	if (!USBFunctionConfigure (&pThis->m_USBFunction))
 	{
-		LogWrite (FromMIDI, LOG_ERROR, "Cannot set interface");
+		LogWrite (FromMIDI, USPI_LOG_ERROR, "Cannot set interface");
 
 		return FALSE;
 	}

@@ -216,14 +216,16 @@ void _USBBulkOnlyMassStorageDevice (TUSBBulkOnlyMassStorageDevice *pThis)
 	if (pThis->m_pEndpointOut != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointOut);
-		free (pThis->m_pEndpointOut);
+		//free (pThis->m_pEndpointOut);
+		dma_free(pThis->m_pEndpointOut, DMA_ALIGNEMENT);
 		pThis->m_pEndpointOut =  0;
 	}
 	
 	if (pThis->m_pEndpointIn != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointIn);
-		free (pThis->m_pEndpointIn);
+		//free (pThis->m_pEndpointIn);
+		dma_free(pThis->m_pEndpointIn, DMA_ALIGNEMENT);
 		pThis->m_pEndpointIn =  0;
 	}
 	
@@ -256,7 +258,8 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 					return FALSE;
 				}
 
-				pThis->m_pEndpointIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				//pThis->m_pEndpointIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				pThis->m_pEndpointIn = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 				assert (pThis->m_pEndpointIn != 0);
 				USBEndpoint2 (pThis->m_pEndpointIn, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
 			}
@@ -269,7 +272,8 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 					return FALSE;
 				}
 
-				pThis->m_pEndpointOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				//pThis->m_pEndpointOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				pThis->m_pEndpointOut = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 				assert (pThis->m_pEndpointOut != 0);
 				USBEndpoint2 (pThis->m_pEndpointOut, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
 			}
@@ -286,7 +290,7 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 
 	if (!USBFunctionConfigure (&pThis->m_USBFunction))
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Cannot set interface");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Cannot set interface");
 
 		return FALSE;
 	}
@@ -304,14 +308,14 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 						 &SCSIInquiryResponse, sizeof SCSIInquiryResponse,
 						 TRUE) != (int) sizeof SCSIInquiryResponse)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Device does not respond");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Device does not respond");
 
 		return FALSE;
 	}
 
 	if (SCSIInquiryResponse.PeripheralDeviceType != SCSI_PDT_DIRECT_ACCESS_BLOCK)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Unsupported device type: 0x%02X", (unsigned) SCSIInquiryResponse.PeripheralDeviceType);
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Unsupported device type: 0x%02X", (unsigned) SCSIInquiryResponse.PeripheralDeviceType);
 		
 		return FALSE;
 	}
@@ -343,7 +347,7 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 							 &SCSIRequestSenseResponse7x, sizeof SCSIRequestSenseResponse7x,
 							 TRUE) < 0)
 		{
-			LogWrite (FromUmsd, LOG_ERROR, "Request sense failed");
+			LogWrite (FromUmsd, USPI_LOG_ERROR, "Request sense failed");
 
 			return FALSE;
 		}
@@ -353,7 +357,7 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 
 	if (nTries == 0)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Unit is not ready");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Unit is not ready");
 
 		return FALSE;
 	}
@@ -373,7 +377,7 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 						 &SCSIReadCapacityResponse, sizeof SCSIReadCapacityResponse,
 						 TRUE) != (int) sizeof SCSIReadCapacityResponse)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Read capacity failed");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Read capacity failed");
 
 		return FALSE;
 	}
@@ -381,7 +385,7 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 	unsigned nBlockSize = uspi_le2be32 (SCSIReadCapacityResponse.BlockLengthInBytes);
 	if (nBlockSize != UMSD_BLOCK_SIZE)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Unsupported block size: %u", nBlockSize);
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Unsupported block size: %u", nBlockSize);
 
 		return FALSE;
 	}
@@ -389,14 +393,14 @@ boolean USBBulkOnlyMassStorageDeviceConfigure (TUSBFunction *pUSBFunction)
 	pThis->m_nBlockCount = uspi_le2be32 (SCSIReadCapacityResponse.ReturnedLogicalBlockAddress);
 	if (pThis->m_nBlockCount == (u32) -1)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Unsupported disk size > 2TB");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Unsupported disk size > 2TB");
 
 		return FALSE;
 	}
 
 	pThis->m_nBlockCount++;
 
-	LogWrite (FromUmsd, LOG_DEBUG, "Capacity is %u MByte", pThis->m_nBlockCount / (0x100000 / UMSD_BLOCK_SIZE));
+	LogWrite (FromUmsd, USPI_LOG_DEBUG, "Capacity is %u MByte", pThis->m_nBlockCount / (0x100000 / UMSD_BLOCK_SIZE));
 
 	TString DeviceName;
 	String (&DeviceName);
@@ -497,7 +501,7 @@ int USBBulkOnlyMassStorageDeviceTryRead (TUSBBulkOnlyMassStorageDevice *pThis, v
 	}
 	unsigned short usTransferLength = (unsigned short) (nCount >> UMSD_BLOCK_SHIFT);
 
-	//LogWrite (FromUmsd, LOG_DEBUG, "TryRead %u/0x%X/%u", nBlockAddress, (unsigned) pBuffer, (unsigned) usTransferLength);
+	//LogWrite (FromUmsd, USPI_LOG_DEBUG, "TryRead %u/0x%X/%u", nBlockAddress, (unsigned) pBuffer, (unsigned) usTransferLength);
 
 	TSCSIRead10 SCSIRead;
 	SCSIRead.OperationCode		= SCSI_OP_READ;
@@ -511,7 +515,7 @@ int USBBulkOnlyMassStorageDeviceTryRead (TUSBBulkOnlyMassStorageDevice *pThis, v
 						 pBuffer, nCount,
 						 TRUE) != (int) nCount)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "TryRead failed");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "TryRead failed");
 
 		return -1;
 	}
@@ -538,7 +542,7 @@ int USBBulkOnlyMassStorageDeviceTryWrite (TUSBBulkOnlyMassStorageDevice *pThis, 
 	}
 	unsigned short usTransferLength = (unsigned short) (nCount >> UMSD_BLOCK_SHIFT);
 
-	//LogWrite (FromUmsd, LOG_DEBUG, "TryWrite %u/0x%X/%u", nBlockAddress, (unsigned) pBuffer, (unsigned) usTransferLength);
+	//LogWrite (FromUmsd, USPI_LOG_DEBUG, "TryWrite %u/0x%X/%u", nBlockAddress, (unsigned) pBuffer, (unsigned) usTransferLength);
 
 	TSCSIWrite10 SCSIWrite;
 	SCSIWrite.OperationCode		= SCSI_OP_WRITE;
@@ -552,7 +556,7 @@ int USBBulkOnlyMassStorageDeviceTryWrite (TUSBBulkOnlyMassStorageDevice *pThis, 
 						 (void *) pBuffer, nCount,
 						 FALSE) < 0)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "TryWrite failed");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "TryWrite failed");
 
 		return -1;
 	}
@@ -587,7 +591,7 @@ int USBBulkOnlyMassStorageDeviceCommand (TUSBBulkOnlyMassStorageDevice *pThis,
 	
 	if (DWHCIDeviceTransfer (pHost, pThis->m_pEndpointOut, &CBW, sizeof CBW) < 0)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "CBW transfer failed");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "CBW transfer failed");
 
 		return -1;
 	}
@@ -599,7 +603,7 @@ int USBBulkOnlyMassStorageDeviceCommand (TUSBBulkOnlyMassStorageDevice *pThis,
 		nResult = DWHCIDeviceTransfer (pHost, bIn ? pThis->m_pEndpointIn : pThis->m_pEndpointOut, pBuffer, nBufLen);
 		if (nResult < 0)
 		{
-			LogWrite (FromUmsd, LOG_ERROR, "Data transfer failed");
+			LogWrite (FromUmsd, USPI_LOG_ERROR, "Data transfer failed");
 
 			return -1;
 		}
@@ -609,21 +613,21 @@ int USBBulkOnlyMassStorageDeviceCommand (TUSBBulkOnlyMassStorageDevice *pThis,
 
 	if (DWHCIDeviceTransfer (pHost, pThis->m_pEndpointIn, &CSW, sizeof CSW) != (int) sizeof CSW)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "CSW transfer failed");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "CSW transfer failed");
 
 		return -1;
 	}
 
 	if (CSW.dCSWSignature != CSWSIGNATURE)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "CSW signature is wrong");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "CSW signature is wrong");
 
 		return -1;
 	}
 
 	if (CSW.dCSWTag != pThis->m_nCWBTag)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "CSW tag is wrong");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "CSW tag is wrong");
 
 		return -1;
 	}
@@ -635,7 +639,7 @@ int USBBulkOnlyMassStorageDeviceCommand (TUSBBulkOnlyMassStorageDevice *pThis,
 
 	if (CSW.dCSWDataResidue != 0)
 	{
-		LogWrite (FromUmsd, LOG_ERROR, "Data residue is not 0");
+		LogWrite (FromUmsd, USPI_LOG_ERROR, "Data residue is not 0");
 
 		return -1;
 	}
@@ -652,21 +656,21 @@ int USBBulkOnlyMassStorageDeviceReset (TUSBBulkOnlyMassStorageDevice *pThis)
 	
 	if (DWHCIDeviceControlMessage (pHost, USBFunctionGetEndpoint0 (&pThis->m_USBFunction), 0x21, 0xFF, 0, 0x00, 0, 0) < 0)
 	{
-		LogWrite (FromUmsd, LOG_DEBUG, "Cannot reset device");
+		LogWrite (FromUmsd, USPI_LOG_DEBUG, "Cannot reset device");
 
 		return -1;
 	}
 
 	if (DWHCIDeviceControlMessage (pHost, USBFunctionGetEndpoint0 (&pThis->m_USBFunction), 0x02, 1, 0, 1, 0, 0) < 0)
 	{
-		LogWrite (FromUmsd, LOG_DEBUG, "Cannot clear halt on endpoint 1");
+		LogWrite (FromUmsd, USPI_LOG_DEBUG, "Cannot clear halt on endpoint 1");
 
 		return -1;
 	}
 
 	if (DWHCIDeviceControlMessage (pHost, USBFunctionGetEndpoint0 (&pThis->m_USBFunction), 0x02, 1, 0, 2, 0, 0) < 0)
 	{
-		LogWrite (FromUmsd, LOG_DEBUG, "Cannot clear halt on endpoint 2");
+		LogWrite (FromUmsd, USPI_LOG_DEBUG, "Cannot clear halt on endpoint 2");
 
 		return -1;
 	}

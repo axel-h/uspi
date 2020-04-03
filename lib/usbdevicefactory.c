@@ -41,56 +41,64 @@ TUSBFunction *USBDeviceFactoryGetDevice (TUSBFunction *pParent, TString *pName)
 	if (   StringCompare (pName, "int9-0-2") == 0
 	    || StringCompare (pName, "int9-0-0") == 0)
 	{
-		TUSBStandardHub *pDevice = (TUSBStandardHub *) malloc (sizeof (TUSBStandardHub));
+		//TUSBStandardHub *pDevice = (TUSBStandardHub *) malloc (sizeof (TUSBStandardHub));
+		TUSBStandardHub *pDevice = (TUSBStandardHub *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		USBStandardHub (pDevice, pParent);
 		pResult = (TUSBFunction *) pDevice;
 	}
 	else if (StringCompare (pName, "int8-6-50") == 0)
 	{
-		TUSBBulkOnlyMassStorageDevice *pDevice = (TUSBBulkOnlyMassStorageDevice *) malloc (sizeof (TUSBBulkOnlyMassStorageDevice));
+		//TUSBBulkOnlyMassStorageDevice *pDevice = (TUSBBulkOnlyMassStorageDevice *) malloc (sizeof (TUSBBulkOnlyMassStorageDevice));
+		TUSBBulkOnlyMassStorageDevice *pDevice = (TUSBBulkOnlyMassStorageDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		USBBulkOnlyMassStorageDevice (pDevice, pParent);
 		pResult = (TUSBFunction *) pDevice;
 	}
 	else if (StringCompare (pName, "int3-1-1") == 0)
 	{
-		TUSBKeyboardDevice *pDevice = (TUSBKeyboardDevice *) malloc (sizeof (TUSBKeyboardDevice));
+		//TUSBKeyboardDevice *pDevice = (TUSBKeyboardDevice *) malloc (sizeof (TUSBKeyboardDevice));
+		TUSBKeyboardDevice *pDevice = (TUSBKeyboardDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		USBKeyboardDevice (pDevice, pParent);
 		pResult = (TUSBFunction *) pDevice;
 	}
 	else if (StringCompare (pName, "int3-1-2") == 0)
 	{
-		TUSBMouseDevice *pDevice = (TUSBMouseDevice *) malloc (sizeof (TUSBMouseDevice));
+		//TUSBMouseDevice *pDevice = (TUSBMouseDevice *) malloc (sizeof (TUSBMouseDevice));
+		TUSBMouseDevice *pDevice = (TUSBMouseDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		USBMouseDevice (pDevice, pParent);
 		pResult = (TUSBFunction *) pDevice;
 	}
 	else if (StringCompare (pName, "ven424-ec00") == 0)
 	{
-		TSMSC951xDevice *pDevice = (TSMSC951xDevice *) malloc (sizeof (TSMSC951xDevice));
+		//TSMSC951xDevice *pDevice = (TSMSC951xDevice *) malloc (sizeof (TSMSC951xDevice));
+		TSMSC951xDevice *pDevice = (TSMSC951xDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		SMSC951xDevice (pDevice, pParent);
 		pResult = (TUSBFunction *) pDevice;
 	}
 	else if (StringCompare (pName, "ven424-7800") == 0)
 	{
-		TLAN7800Device *pDevice = (TLAN7800Device *) malloc (sizeof (TLAN7800Device));
+		//TLAN7800Device *pDevice = (TLAN7800Device *) malloc (sizeof (TLAN7800Device));
+		TLAN7800Device *pDevice = (TLAN7800Device *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		LAN7800Device (pDevice, pParent);
 		pResult = (TUSBFunction *) pDevice;
 	}
     else if (StringCompare (pName, "int3-0-0") == 0)
     {
-        TUSBGamePadDevice *pDevice = (TUSBGamePadDevice *) malloc (sizeof (TUSBGamePadDevice));
+        //TUSBGamePadDevice *pDevice = (TUSBGamePadDevice *) malloc (sizeof (TUSBGamePadDevice));
+		TUSBGamePadDevice *pDevice = (TUSBGamePadDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
         assert (pDevice != 0);
         USBGamePadDevice (pDevice, pParent);
         pResult = (TUSBFunction *) pDevice;
     }
 	else if (StringCompare (pName, "int1-3-0") == 0)
 	{
-		TUSBMIDIDevice *pDevice = (TUSBMIDIDevice *) malloc (sizeof (TUSBMIDIDevice));
+		//TUSBMIDIDevice *pDevice = (TUSBMIDIDevice *) malloc (sizeof (TUSBMIDIDevice));
+		TUSBMIDIDevice *pDevice = (TUSBMIDIDevice *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pDevice != 0);
 		USBMIDIDevice (pDevice, pParent);
 		pResult = (TUSBFunction *)pDevice;
@@ -99,7 +107,7 @@ TUSBFunction *USBDeviceFactoryGetDevice (TUSBFunction *pParent, TString *pName)
 
 	if (pResult != 0)
 	{
-		LogWrite ("usbdev", LOG_NOTICE, "Using device/interface %s", StringGet (pName));
+		LogWrite ("usbdev", USPI_LOG_NOTICE, "Using device/interface %s", StringGet (pName));
 	}
 	
 	_String (pName);

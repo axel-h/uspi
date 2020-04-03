@@ -52,14 +52,16 @@ void _USBStandardHub (TUSBStandardHub *pThis)
 	{
 		if (pThis->m_pStatus[nPort] != 0)
 		{
-			free (pThis->m_pStatus[nPort]);
+			//free (pThis->m_pStatus[nPort]);
+			dma_free(pThis->m_pStatus[nPort], DMA_ALIGNEMENT);
 			pThis->m_pStatus[nPort] = 0;
 		}
 
 		if (pThis->m_pDevice[nPort] != 0)
 		{
 			_USBDevice (pThis->m_pDevice[nPort]);
-			free (pThis->m_pDevice[nPort]);
+			//free (pThis->m_pDevice[nPort]);
+			dma_free(pThis->m_pDevice[nPort], DMA_ALIGNEMENT);
 			pThis->m_pDevice[nPort] = 0;
 		}
 	}
@@ -68,7 +70,8 @@ void _USBStandardHub (TUSBStandardHub *pThis)
 
 	if (pThis->m_pHubDesc != 0)
 	{
-		free (pThis->m_pHubDesc);
+		//free (pThis->m_pHubDesc);
+		dma_free(pThis->m_pHubDesc, DMA_ALIGNEMENT);
 		pThis->m_pHubDesc = 0;
 	}
 
@@ -100,7 +103,7 @@ boolean USBStandardHubConfigure (TUSBFunction *pUSBFunction)
 
 	if (!USBFunctionConfigure (&pThis->m_USBFunction))
 	{
-		LogWrite (FromHub, LOG_ERROR, "Cannot set interface");
+		LogWrite (FromHub, USPI_LOG_ERROR, "Cannot set interface");
 
 		return FALSE;
 	}
@@ -109,7 +112,8 @@ boolean USBStandardHubConfigure (TUSBFunction *pUSBFunction)
 	assert (pHost != 0);
 
 	assert (pThis->m_pHubDesc == 0);
-	pThis->m_pHubDesc = (TUSBHubDescriptor *) malloc (sizeof (TUSBHubDescriptor));
+	//pThis->m_pHubDesc = (TUSBHubDescriptor *) malloc (sizeof (TUSBHubDescriptor));
+	pThis->m_pHubDesc = (TUSBHubDescriptor *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pHubDesc != 0);
 
 	if (DWHCIDeviceGetDescriptor (pHost, USBFunctionGetEndpoint0 (&pThis->m_USBFunction),
@@ -118,9 +122,10 @@ boolean USBStandardHubConfigure (TUSBFunction *pUSBFunction)
 					REQUEST_IN | REQUEST_CLASS)
 	   != (int) sizeof *pThis->m_pHubDesc)
 	{
-		LogWrite (FromHub, LOG_ERROR, "Cannot get hub descriptor");
+		LogWrite (FromHub, USPI_LOG_ERROR, "Cannot get hub descriptor");
 		
-		free (pThis->m_pHubDesc);
+		//free (pThis->m_pHubDesc);
+		dma_free(pThis->m_pHubDesc, DMA_ALIGNEMENT);
 		pThis->m_pHubDesc = 0;
 		
 		return FALSE;
@@ -133,9 +138,10 @@ boolean USBStandardHubConfigure (TUSBFunction *pUSBFunction)
 	pThis->m_nPorts = pThis->m_pHubDesc->bNbrPorts;
 	if (pThis->m_nPorts > USB_HUB_MAX_PORTS)
 	{
-		LogWrite (FromHub, LOG_ERROR, "Too many ports (%u)", pThis->m_nPorts);
+		LogWrite (FromHub, USPI_LOG_ERROR, "Too many ports (%u)", pThis->m_nPorts);
 		
-		free (pThis->m_pHubDesc);
+		//free (pThis->m_pHubDesc);
+		dma_free(pThis->m_pHubDesc, DMA_ALIGNEMENT);
 		pThis->m_pHubDesc = 0;
 		
 		return FALSE;
@@ -143,7 +149,7 @@ boolean USBStandardHubConfigure (TUSBFunction *pUSBFunction)
 
 	if (!USBStandardHubEnumeratePorts (pThis))
 	{
-		LogWrite (FromHub, LOG_ERROR, "Port enumeration failed");
+		LogWrite (FromHub, USPI_LOG_ERROR, "Port enumeration failed");
 
 		return FALSE;
 	}
@@ -170,7 +176,7 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 			REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
 			SET_FEATURE, PORT_POWER, nPort+1, 0, 0) < 0)
 		{
-			LogWrite (FromHub, LOG_ERROR, "Cannot power port %u", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Cannot power port %u", nPort+1);
 
 			return FALSE;
 		}
@@ -184,14 +190,15 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 	for (unsigned nPort = 0; nPort < pThis->m_nPorts; nPort++)
 	{
 		assert (pThis->m_pStatus[nPort] == 0);
-		pThis->m_pStatus[nPort] = malloc (sizeof (TUSBPortStatus));
+		//pThis->m_pStatus[nPort] = malloc (sizeof (TUSBPortStatus));
+		pThis->m_pStatus[nPort] = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pThis->m_pStatus[nPort] != 0);
 
 		if (DWHCIDeviceControlMessage (pHost, pEndpoint0,
 			REQUEST_IN | REQUEST_CLASS | REQUEST_TO_OTHER,
 			GET_STATUS, 0, nPort+1, pThis->m_pStatus[nPort], 4) != 4)
 		{
-			LogWrite (FromHub, LOG_ERROR, "Cannot get status of port %u", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Cannot get status of port %u", nPort+1);
 
 			continue;
 		}
@@ -206,7 +213,7 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 			REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
 			SET_FEATURE, PORT_RESET, nPort+1, 0, 0) < 0)
 		{
-			LogWrite (FromHub, LOG_ERROR, "Cannot reset port %u", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Cannot reset port %u", nPort+1);
 
 			continue;
 		}
@@ -220,11 +227,11 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 			return FALSE;
 		}
 
-		//LogWrite (FromHub, LOG_DEBUG, "Port %u status is 0x%04X", nPort+1, (unsigned) pThis->m_pStatus[nPort]->wPortStatus);
+		//LogWrite (FromHub, USPI_LOG_DEBUG, "Port %u status is 0x%04X", nPort+1, (unsigned) pThis->m_pStatus[nPort]->wPortStatus);
 		
 		if (!(pThis->m_pStatus[nPort]->wPortStatus & PORT_ENABLE__MASK))
 		{
-			LogWrite (FromHub, LOG_ERROR, "Port %u is not enabled", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Port %u is not enabled", nPort+1);
 
 			continue;
 		}
@@ -236,7 +243,7 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 				REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
 				CLEAR_FEATURE, PORT_POWER, nPort+1, 0, 0);
 
-			LogWrite (FromHub, LOG_ERROR, "Over-current condition on port %u", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Over-current condition on port %u", nPort+1);
 
 			return FALSE;
 		}
@@ -275,14 +282,18 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 
 		// first create default device
 		assert (pThis->m_pDevice[nPort] == 0);
-		pThis->m_pDevice[nPort] = malloc (sizeof (TUSBDevice));
+
+		//pThis->m_pDevice[nPort] = malloc (sizeof (TUSBDevice));
+		pThis->m_pDevice[nPort] = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pThis->m_pDevice[nPort] != 0);
+		
 		USBDevice (pThis->m_pDevice[nPort], pHost, Speed, bSplit, ucHubAddress, ucHubPortNumber);
 
 		if (!USBDeviceInitialize (pThis->m_pDevice[nPort]))
 		{
 			_USBDevice (pThis->m_pDevice[nPort]);
-			free (pThis->m_pDevice[nPort]);
+			//free (pThis->m_pDevice[nPort]);
+			dma_free(pThis->m_pDevice[nPort], DMA_ALIGNEMENT);
 			pThis->m_pDevice[nPort] = 0;
 
 			continue;
@@ -299,29 +310,32 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 
 		if (!USBDeviceConfigure (pThis->m_pDevice[nPort]))
 		{
-			LogWrite (FromHub, LOG_ERROR, "Port %u: Cannot configure device", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Port %u: Cannot configure device", nPort+1);
 
 			_USBDevice (pThis->m_pDevice[nPort]);
-			free (pThis->m_pDevice[nPort]);
+			//free (pThis->m_pDevice[nPort]);
+			dma_free(pThis->m_pDevice[nPort], DMA_ALIGNEMENT);
 			pThis->m_pDevice[nPort] = 0;
 
 			continue;
 		}
 
-		LogWrite (FromHub, LOG_DEBUG, "Port %u: Device configured", nPort+1);
+		LogWrite (FromHub, USPI_LOG_DEBUG, "Port %u: Device configured", nPort+1);
 	}
 
 	// again check for over-current
-	TUSBHubStatus *pHubStatus = malloc (sizeof (TUSBHubStatus));
+	//TUSBHubStatus *pHubStatus = malloc (sizeof (TUSBHubStatus));
+	TUSBHubStatus *pHubStatus = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pHubStatus != 0);
 
 	if (DWHCIDeviceControlMessage (pHost, pEndpoint0,
 		REQUEST_IN | REQUEST_CLASS,
 		GET_STATUS, 0, 0, pHubStatus, sizeof *pHubStatus) != (int) sizeof *pHubStatus)
 	{
-		LogWrite (FromHub, LOG_ERROR, "Cannot get hub status");
+		LogWrite (FromHub, USPI_LOG_ERROR, "Cannot get hub status");
 
-		free (pHubStatus);
+		//free (pHubStatus);
+		dma_free(pHubStatus, DMA_ALIGNEMENT);
 
 		return FALSE;
 	}
@@ -335,14 +349,16 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 				CLEAR_FEATURE, PORT_POWER, nPort+1, 0, 0);
 		}
 
-		LogWrite (FromHub, LOG_ERROR, "Hub over-current condition");
+		LogWrite (FromHub, USPI_LOG_ERROR, "Hub over-current condition");
 
-		free (pHubStatus);
+		//free (pHubStatus);
+		dma_free(pHubStatus, DMA_ALIGNEMENT);
 
 		return FALSE;
 	}
 
-	free (pHubStatus);
+	//free (pHubStatus);
+	dma_free(pHubStatus, DMA_ALIGNEMENT);
 	pHubStatus = 0;
 
 	boolean bResult = TRUE;
@@ -362,7 +378,7 @@ boolean USBStandardHubEnumeratePorts (TUSBStandardHub *pThis)
 				REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
 				CLEAR_FEATURE, PORT_POWER, nPort+1, 0, 0);
 
-			LogWrite (FromHub, LOG_ERROR, "Over-current condition on port %u", nPort+1);
+			LogWrite (FromHub, USPI_LOG_ERROR, "Over-current condition on port %u", nPort+1);
 
 			bResult = FALSE;
 		}

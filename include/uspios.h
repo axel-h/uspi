@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 //
 // System configuration
 //
@@ -52,8 +54,15 @@ extern "C" {
 //
 // (Must work from interrupt context)
 //
+#define DMA_PAGE_SIZE	4096
+#define DMA_ALIGNEMENT 	4096
+
 void *malloc (unsigned nSize);		// result must be 4-byte aligned
 void free (void *pBlock);
+
+void *dma_alloc (unsigned nSize, unsigned alignement);
+void dma_free (void *pBlock, unsigned alignement);
+uintptr_t dma_getPhysicalAddr(void *ptr);
 
 //
 // Timer

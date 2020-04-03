@@ -60,7 +60,8 @@ void USBDevice (TUSBDevice *pThis, struct TDWHCIDevice *pHost, TUSBSpeed Speed,
 	assert (pThis->m_pHost != 0);
 
 	assert (pThis->m_pEndpoint0 == 0);
-	pThis->m_pEndpoint0 = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+	//pThis->m_pEndpoint0 = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+	pThis->m_pEndpoint0 = (TUSBEndpoint *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pEndpoint0 != 0);
 	USBEndpoint (pThis->m_pEndpoint0, pThis);
 	
@@ -84,7 +85,8 @@ void _USBDevice (TUSBDevice *pThis)
 		if (pThis->m_pFunction[nFunction] != 0)
 		{
 			_USBFunction (pThis->m_pFunction[nFunction]);
-			free (pThis->m_pFunction[nFunction]);
+			//free (pThis->m_pFunction[nFunction]);
+			dma_free(pThis->m_pFunction[nFunction], DMA_ALIGNEMENT);
 			pThis->m_pFunction[nFunction] = 0;
 		}
 	}
@@ -92,26 +94,30 @@ void _USBDevice (TUSBDevice *pThis)
 	if (pThis->m_pConfigParser != 0)
 	{
 		_USBConfigurationParser (pThis->m_pConfigParser);
-		free (pThis->m_pConfigParser);
+		//free (pThis->m_pConfigParser);
+		dma_free(pThis->m_pConfigParser, DMA_ALIGNEMENT);
 		pThis->m_pConfigParser = 0;
 	}
 
 	if (pThis->m_pConfigDesc != 0)
 	{
-		free (pThis->m_pConfigDesc);
+		//free (pThis->m_pConfigDesc);
+		dma_free(pThis->m_pConfigDesc, DMA_ALIGNEMENT);
 		pThis->m_pConfigDesc = 0;
 	}
 
 	if (pThis->m_pDeviceDesc != 0)
 	{
-		free (pThis->m_pDeviceDesc);
+		//free (pThis->m_pDeviceDesc);
+		dma_free(pThis->m_pDeviceDesc, DMA_ALIGNEMENT);
 		pThis->m_pDeviceDesc = 0;
 	}
 
 	if (pThis->m_pEndpoint0 != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpoint0);
-		free (pThis->m_pEndpoint0);
+		//free (pThis->m_pEndpoint0);
+		dma_free(pThis->m_pEndpoint0, DMA_ALIGNEMENT);
 		pThis->m_pEndpoint0 = 0;
 	}
 
@@ -126,7 +132,8 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 	assert (pThis != 0);
 
 	assert (pThis->m_pDeviceDesc == 0);
-	pThis->m_pDeviceDesc = (TUSBDeviceDescriptor *) malloc (sizeof (TUSBDeviceDescriptor));
+	// pThis->m_pDeviceDesc = (TUSBDeviceDescriptor *) malloc (sizeof (TUSBDeviceDescriptor));
+	pThis->m_pDeviceDesc = (TUSBDeviceDescriptor *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pDeviceDesc != 0);
 
 	assert (pThis->m_pHost != 0);
@@ -138,9 +145,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 				    pThis->m_pDeviceDesc, USB_DEFAULT_MAX_PACKET_SIZE, REQUEST_IN)
 	    != USB_DEFAULT_MAX_PACKET_SIZE)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Cannot get device descriptor (short)");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Cannot get device descriptor (short)");
 
-		free (pThis->m_pDeviceDesc);
+		//free (pThis->m_pDeviceDesc);
+		dma_free(pThis->m_pDeviceDesc, DMA_ALIGNEMENT);
 		pThis->m_pDeviceDesc = 0;
 
 		return FALSE;
@@ -149,9 +157,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 	if (   pThis->m_pDeviceDesc->bLength	     != sizeof *pThis->m_pDeviceDesc
 	    || pThis->m_pDeviceDesc->bDescriptorType != DESCRIPTOR_DEVICE)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Invalid device descriptor");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Invalid device descriptor");
 
-		free (pThis->m_pDeviceDesc);
+		//free (pThis->m_pDeviceDesc);
+		dma_free(pThis->m_pDeviceDesc, DMA_ALIGNEMENT);
 		pThis->m_pDeviceDesc = 0;
 
 		return FALSE;
@@ -164,9 +173,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 				    pThis->m_pDeviceDesc, sizeof *pThis->m_pDeviceDesc, REQUEST_IN)
 	    != (int) sizeof *pThis->m_pDeviceDesc)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Cannot get device descriptor");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Cannot get device descriptor");
 
-		free (pThis->m_pDeviceDesc);
+		//free (pThis->m_pDeviceDesc);
+		dma_free(pThis->m_pDeviceDesc, DMA_ALIGNEMENT);
 		pThis->m_pDeviceDesc = 0;
 
 		return FALSE;
@@ -179,14 +189,14 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 	u8 ucAddress = s_ucNextAddress++;
 	if (ucAddress > USB_MAX_ADDRESS)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Too many devices");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Too many devices");
 
 		return FALSE;
 	}
 
 	if (!DWHCIDeviceSetAddress (pThis->m_pHost, pThis->m_pEndpoint0, ucAddress))
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Cannot set address %u", (unsigned) ucAddress);
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Cannot set address %u", (unsigned) ucAddress);
 
 		return FALSE;
 	}
@@ -212,7 +222,7 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 	}
 
 	assert (pThis->m_pConfigDesc == 0);
-	pThis->m_pConfigDesc = (TUSBConfigurationDescriptor *) malloc (sizeof (TUSBConfigurationDescriptor));
+	pThis->m_pConfigDesc = (TUSBConfigurationDescriptor *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pConfigDesc != 0);
 
 	if (DWHCIDeviceGetDescriptor (pThis->m_pHost, pThis->m_pEndpoint0,
@@ -220,9 +230,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 				    pThis->m_pConfigDesc, sizeof *pThis->m_pConfigDesc, REQUEST_IN)
 	    != (int) sizeof *pThis->m_pConfigDesc)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Cannot get configuration descriptor (short)");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Cannot get configuration descriptor (short)");
 
-		free (pThis->m_pConfigDesc);
+		//free (pThis->m_pConfigDesc);
+		dma_free(pThis->m_pConfigDesc, DMA_ALIGNEMENT);
 		pThis->m_pConfigDesc = 0;
 
 		return FALSE;
@@ -232,9 +243,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 	    || pThis->m_pConfigDesc->bDescriptorType != DESCRIPTOR_CONFIGURATION
 	    || pThis->m_pConfigDesc->wTotalLength    >  MAX_CONFIG_DESC_SIZE)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Invalid configuration descriptor");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Invalid configuration descriptor");
 		
-		free (pThis->m_pConfigDesc);
+		//free (pThis->m_pConfigDesc);
+		dma_free(pThis->m_pConfigDesc, DMA_ALIGNEMENT);
 		pThis->m_pConfigDesc = 0;
 
 		return FALSE;
@@ -242,9 +254,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 
 	unsigned nTotalLength = pThis->m_pConfigDesc->wTotalLength;
 
-	free (pThis->m_pConfigDesc);
+	//free (pThis->m_pConfigDesc);
+	dma_free(pThis->m_pConfigDesc, DMA_ALIGNEMENT);
 
-	pThis->m_pConfigDesc = (TUSBConfigurationDescriptor *) malloc (nTotalLength);
+	pThis->m_pConfigDesc = (TUSBConfigurationDescriptor *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pConfigDesc != 0);
 
 	if (DWHCIDeviceGetDescriptor (pThis->m_pHost, pThis->m_pEndpoint0,
@@ -252,9 +265,10 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 				    pThis->m_pConfigDesc, nTotalLength, REQUEST_IN)
 	    != (int) nTotalLength)
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Cannot get configuration descriptor");
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Cannot get configuration descriptor");
 
-		free (pThis->m_pConfigDesc);
+		//free (pThis->m_pConfigDesc);
+		dma_free(pThis->m_pConfigDesc, DMA_ALIGNEMENT);
 		pThis->m_pConfigDesc = 0;
 
 		return FALSE;
@@ -265,10 +279,11 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 #endif
 
 	assert (pThis->m_pConfigParser == 0);
-	pThis->m_pConfigParser = malloc (sizeof (TUSBConfigurationParser));
+	//pThis->m_pConfigParser = malloc (sizeof (TUSBConfigurationParser));
+	pThis->m_pConfigParser = (TUSBConfigurationParser *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pConfigParser != 0);
 	USBConfigurationParser (pThis->m_pConfigParser, pThis->m_pConfigDesc, nTotalLength);
-	
+
 	if (!USBConfigurationParserIsValid (pThis->m_pConfigParser))
 	{
 		USBDeviceConfigurationError (pThis, FromDevice);
@@ -278,7 +293,7 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 
 	TString *pNames	= USBDeviceGetNames (pThis);
 	assert (pNames != 0);
-	USBDeviceLogWrite (pThis, LOG_NOTICE, "Device %s found", StringGet (pNames));
+	USBDeviceLogWrite (pThis, USPI_LOG_NOTICE, "Device %s found", StringGet (pNames));
 	_String (pNames);
 	 free (pNames);
 
@@ -295,7 +310,7 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 
 		if (pInterfaceDesc->bInterfaceNumber != ucInterfaceNumber)
 		{
-			USBDeviceLogWrite (pThis, LOG_DEBUG, "Alternate setting %u ignored",
+			USBDeviceLogWrite (pThis, USPI_LOG_DEBUG, "Alternate setting %u ignored",
 					   (unsigned) pInterfaceDesc->bAlternateSetting);
 
 			continue;
@@ -303,7 +318,8 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 
 		assert (pThis->m_pConfigParser != 0);
 		assert (pThis->m_pFunction[nFunction] == 0);
-		pThis->m_pFunction[nFunction] = (TUSBFunction *) malloc (sizeof (TUSBFunction));
+		//pThis->m_pFunction[nFunction] = (TUSBFunction *) malloc (sizeof (TUSBFunction));
+		pThis->m_pFunction[nFunction] = (TUSBFunction *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pThis->m_pFunction[nFunction] != 0);
 		USBFunction (pThis->m_pFunction[nFunction], pThis, pThis->m_pConfigParser);
 
@@ -324,7 +340,7 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 			assert (pName != 0);
 			if (StringCompare (pName, "unknown") != 0)
 			{
-				USBDeviceLogWrite (pThis, LOG_NOTICE, "Interface %s found", StringGet (pName));
+				USBDeviceLogWrite (pThis, USPI_LOG_NOTICE, "Interface %s found", StringGet (pName));
 
 				pChild = USBDeviceFactoryGetDevice (pThis->m_pFunction[nFunction], pName);
 			}
@@ -336,12 +352,13 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 		}
 
 		_USBFunction (pThis->m_pFunction[nFunction]);
-		free (pThis->m_pFunction[nFunction]);
+		//free (pThis->m_pFunction[nFunction]);
+		dma_free(pThis->m_pFunction[nFunction], DMA_ALIGNEMENT);
 		pThis->m_pFunction[nFunction] = 0;
 
 		if (pChild == 0)
 		{
-			USBDeviceLogWrite (pThis, LOG_WARNING, "Function is not supported");
+			USBDeviceLogWrite (pThis, USPI_LOG_WARNING, "Function is not supported");
 
 			continue;
 		}
@@ -350,7 +367,7 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 
 		if (++nFunction == USBDEV_MAX_FUNCTIONS)
 		{
-			USBDeviceLogWrite (pThis, LOG_WARNING, "Too many functions per device");
+			USBDeviceLogWrite (pThis, USPI_LOG_WARNING, "Too many functions per device");
 
 			break;
 		}
@@ -360,7 +377,7 @@ boolean USBDeviceInitialize (TUSBDevice *pThis)
 
 	if (nFunction == 0)
 	{
-		USBDeviceLogWrite (pThis, LOG_WARNING, "Device has no supported function");
+		USBDeviceLogWrite (pThis, USPI_LOG_WARNING, "Device has no supported function");
 
 		return FALSE;
 	}
@@ -382,7 +399,7 @@ boolean USBDeviceConfigure (TUSBDevice *pThis)
 
 	if (!DWHCIDeviceSetConfiguration (pThis->m_pHost, pThis->m_pEndpoint0, pThis->m_pConfigDesc->bConfigurationValue))
 	{
-		USBDeviceLogWrite (pThis, LOG_ERROR, "Cannot set configuration (%u)",
+		USBDeviceLogWrite (pThis, USPI_LOG_ERROR, "Cannot set configuration (%u)",
 			     (unsigned) pThis->m_pConfigDesc->bConfigurationValue);
 
 		return FALSE;
@@ -396,10 +413,11 @@ boolean USBDeviceConfigure (TUSBDevice *pThis)
 		{
 			if (!(*pThis->m_pFunction[nFunction]->Configure) (pThis->m_pFunction[nFunction]))
 			{
-				//LogWrite (LOG_ERROR, "Cannot configure device");
+				//LogWrite (USPI_LOG_ERROR, "Cannot configure device");
 
 				_USBFunction (pThis->m_pFunction[nFunction]);
-				free (pThis->m_pFunction[nFunction]);
+				//free (pThis->m_pFunction[nFunction]);
+				dma_free(pThis->m_pFunction[nFunction], DMA_ALIGNEMENT);
 				pThis->m_pFunction[nFunction] = 0;
 			}
 			else
@@ -565,8 +583,6 @@ void USBDeviceSetAddress (TUSBDevice *pThis, u8 ucAddress)
 
 	assert (ucAddress <= USB_MAX_ADDRESS);
 	pThis->m_ucAddress = ucAddress;
-
-	//USBDeviceLogWrite (pThis, LOG_DEBUG, "Device address set to %u", (unsigned) pThis->m_ucAddress);
 }
 
 void USBDeviceLogWrite (TUSBDevice *pThis, unsigned Severity, const char *pMessage, ...)

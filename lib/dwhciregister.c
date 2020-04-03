@@ -130,13 +130,13 @@ void DWHCIRegisterDump (TDWHCIRegister *pThis)
 	assert (pThis != 0);
 	if (pThis->m_bValid)
 	{
-		LogWrite ("dwhci", LOG_DEBUG,
+		LogWrite ("dwhci", USPI_LOG_DEBUG,
 			     "Register at 0x%X is 0x%X",
 			     pThis->m_nAddress & 0xFFF, pThis->m_nBuffer);
 	}
 	else
 	{
-		LogWrite ("dwhci", LOG_DEBUG,
+		LogWrite ("dwhci", USPI_LOG_DEBUG,
 			     "Register at 0x%X was not set",
 			     pThis->m_nAddress & 0xFFF);
 	}

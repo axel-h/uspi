@@ -143,7 +143,8 @@ void SMSC951xDevice (TSMSC951xDevice *pThis, TUSBFunction *pDevice)
 	pThis->m_pEndpointBulkOut = 0;
 	pThis->m_pTxBuffer = 0;
 
-	pThis->m_pTxBuffer = malloc (FRAME_BUFFER_SIZE);
+	//pThis->m_pTxBuffer = malloc (FRAME_BUFFER_SIZE);
+	pThis->m_pTxBuffer = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pTxBuffer != 0);
 }
 
@@ -153,21 +154,24 @@ void _SMSC951xDevice (TSMSC951xDevice *pThis)
 
 	if (pThis->m_pTxBuffer != 0)
 	{
-		free (pThis->m_pTxBuffer);
+		//free (pThis->m_pTxBuffer);
+		dma_free(pThis->m_pTxBuffer, DMA_ALIGNEMENT);
 		pThis->m_pTxBuffer = 0;
 	}
 	
 	if (pThis->m_pEndpointBulkOut != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointBulkOut);
-		free (pThis->m_pEndpointBulkOut);
+		//free (pThis->m_pEndpointBulkOut);
+		dma_free(pThis->m_pEndpointBulkOut, DMA_ALIGNEMENT);
 		pThis->m_pEndpointBulkOut = 0;
 	}
 	
 	if (pThis->m_pEndpointBulkIn != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointBulkIn);
-		free (pThis->m_pEndpointBulkIn);
+		//free (pThis->m_pEndpointBulkIn);
+		dma_free(pThis->m_pEndpointBulkIn, DMA_ALIGNEMENT);
 		pThis->m_pEndpointBulkIn = 0;
 	}
 	
@@ -186,14 +190,14 @@ boolean SMSC951xDeviceConfigure (TUSBFunction *pUSBFunction)
 	}
 	else
 	{
-		LogWrite (FromSMSC951x, LOG_ERROR, "Cannot get MAC address");
+		LogWrite (FromSMSC951x, USPI_LOG_ERROR, "Cannot get MAC address");
 
 		return FALSE;
 	}
 	TString MACString;
 	String (&MACString);
 	MACAddressFormat (&pThis->m_MACAddress, &MACString);
-	LogWrite (FromSMSC951x, LOG_DEBUG, "MAC address is %s", StringGet (&MACString));
+	LogWrite (FromSMSC951x, USPI_LOG_DEBUG, "MAC address is %s", StringGet (&MACString));
 
 	if (USBFunctionGetNumEndpoints (&pThis->m_USBFunction) != 3)
 	{
@@ -220,7 +224,8 @@ boolean SMSC951xDeviceConfigure (TUSBFunction *pUSBFunction)
 					return FALSE;
 				}
 
-				pThis->m_pEndpointBulkIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				//pThis->m_pEndpointBulkIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				pThis->m_pEndpointBulkIn = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 				assert (pThis->m_pEndpointBulkIn);
 				USBEndpoint2 (pThis->m_pEndpointBulkIn, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
 			}
@@ -235,7 +240,8 @@ boolean SMSC951xDeviceConfigure (TUSBFunction *pUSBFunction)
 					return FALSE;
 				}
 
-				pThis->m_pEndpointBulkOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				//pThis->m_pEndpointBulkOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+				pThis->m_pEndpointBulkOut = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 				assert (pThis->m_pEndpointBulkOut);
 				USBEndpoint2 (pThis->m_pEndpointBulkOut, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
 			}
@@ -254,7 +260,7 @@ boolean SMSC951xDeviceConfigure (TUSBFunction *pUSBFunction)
 
 	if (!USBFunctionConfigure (&pThis->m_USBFunction))
 	{
-		LogWrite (FromSMSC951x, LOG_ERROR, "Cannot set interface");
+		LogWrite (FromSMSC951x, USPI_LOG_ERROR, "Cannot set interface");
 
 		_String (&MACString);
 
@@ -272,7 +278,7 @@ boolean SMSC951xDeviceConfigure (TUSBFunction *pUSBFunction)
 	if (   !SMSC951xDeviceWriteReg (pThis, ADDRH, usMACAddressHigh)
 	    || !SMSC951xDeviceWriteReg (pThis, ADDRL, nMACAddressLow))
 	{
-		LogWrite (FromSMSC951x, LOG_ERROR, "Cannot set MAC address");
+		LogWrite (FromSMSC951x, USPI_LOG_ERROR, "Cannot set MAC address");
 
 		_String (&MACString);
 
@@ -288,7 +294,7 @@ boolean SMSC951xDeviceConfigure (TUSBFunction *pUSBFunction)
 						       | MAC_CR_RXEN)
 	    || !SMSC951xDeviceWriteReg (pThis, TX_CFG, TX_CFG_ON))
 	{
-		LogWrite (FromSMSC951x, LOG_ERROR, "Cannot start device");
+		LogWrite (FromSMSC951x, USPI_LOG_ERROR, "Cannot start device");
 
 		_String (&MACString);
 
@@ -360,7 +366,7 @@ boolean SMSC951xDeviceReceiveFrame (TSMSC951xDevice *pThis, void *pBuffer, unsig
 	u32 nRxStatus = *(u32 *) pBuffer;
 	if (nRxStatus & RX_STS_ERROR)
 	{
-		LogWrite (FromSMSC951x, LOG_WARNING, "RX error (status 0x%X)", nRxStatus);
+		LogWrite (FromSMSC951x, USPI_LOG_WARNING, "RX error (status 0x%X)", nRxStatus);
 
 		_USBRequest (&URB);
 
@@ -378,7 +384,7 @@ boolean SMSC951xDeviceReceiveFrame (TSMSC951xDevice *pThis, void *pBuffer, unsig
 	}
 	nFrameLength -= 4;	// ignore CRC
 
-	//LogWrite (FromSMSC951x, LOG_DEBUG, "Frame received (status 0x%X)", nRxStatus);
+	//LogWrite (FromSMSC951x, USPI_LOG_DEBUG, "Frame received (status 0x%X)", nRxStatus);
 
 	memcpy (pBuffer, (u8 *) pBuffer + 4, nFrameLength);	// overwrite RX status
 
@@ -502,12 +508,12 @@ void SMSC951xDeviceDumpReg (TSMSC951xDevice *pThis, const char *pName, u32 nInde
 	u32 nValue;
 	if (!SMSC951xDeviceReadReg (pThis, nIndex, &nValue))
 	{
-		LogWrite (FromSMSC951x, LOG_ERROR, "Cannot read register 0x%X", nIndex);
+		LogWrite (FromSMSC951x, USPI_LOG_ERROR, "Cannot read register 0x%X", nIndex);
 
 		return;
 	}
 
-	LogWrite (FromSMSC951x, LOG_DEBUG, "%08X %s", nValue, pName);
+	LogWrite (FromSMSC951x, USPI_LOG_DEBUG, "%08X %s", nValue, pName);
 }
 
 void SMSC951xDeviceDumpRegs (TSMSC951xDevice *pThis)

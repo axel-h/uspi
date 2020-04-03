@@ -109,7 +109,8 @@ void USBGamePadDevice (TUSBGamePadDevice *pThis, TUSBFunction *pDevice)
     pThis->m_State.nbuttons = 0;
     pThis->m_State.buttons = 0;
 
-	pThis->m_pReportBuffer = malloc (64);
+	//pThis->m_pReportBuffer = malloc (64);
+    pThis->m_pReportBuffer = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pReportBuffer != 0);
 }
 
@@ -119,27 +120,31 @@ void _CUSBGamePadDevice (TUSBGamePadDevice *pThis)
 
     if (pThis->m_pHIDReportDescriptor != 0)
     {
-        free (pThis->m_pHIDReportDescriptor);
+        //free (pThis->m_pHIDReportDescriptor);
+        dma_free(pThis->m_pHIDReportDescriptor, DMA_ALIGNEMENT);
         pThis->m_pHIDReportDescriptor = 0;
     }
 
 	if (pThis->m_pReportBuffer != 0)
 	{
-		free (pThis->m_pReportBuffer);
+		//free (pThis->m_pReportBuffer);
+        dma_free(pThis->m_pReportBuffer, DMA_ALIGNEMENT);
 		pThis->m_pReportBuffer = 0;
 	}
 
 	if (pThis->m_pEndpointIn != 0)
 	{
 		_USBEndpoint (pThis->m_pEndpointIn);
-		free (pThis->m_pEndpointIn);
+		//free (pThis->m_pEndpointIn);
+        dma_free(pThis->m_pEndpointIn, DMA_ALIGNEMENT);
 		pThis->m_pEndpointIn = 0;
 	}
 
     if (pThis->m_pEndpointOut != 0)
     {
         _USBEndpoint (pThis->m_pEndpointOut);
-        free (pThis->m_pEndpointOut);
+        //free (pThis->m_pEndpointOut);
+        dma_free(pThis->m_pEndpointOut, DMA_ALIGNEMENT);
         pThis->m_pEndpointOut = 0;
     }
 
@@ -368,7 +373,8 @@ boolean USBGamePadDeviceConfigure (TUSBFunction *pUSBFunction)
                     return FALSE;
                 }
 
-                pThis->m_pEndpointIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+                //pThis->m_pEndpointIn = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+                pThis->m_pEndpointIn = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
                 assert (pThis->m_pEndpointIn != 0);
                 USBEndpoint2 (pThis->m_pEndpointIn, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
             }
@@ -381,7 +387,8 @@ boolean USBGamePadDeviceConfigure (TUSBFunction *pUSBFunction)
                     return FALSE;
                 }
 
-                pThis->m_pEndpointOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+                //pThis->m_pEndpointOut = (TUSBEndpoint *) malloc (sizeof (TUSBEndpoint));
+                pThis->m_pEndpointOut = (TUSBEndpoint *) dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
                 assert (pThis->m_pEndpointOut != 0);
                 USBEndpoint2 (pThis->m_pEndpointOut, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
             }
@@ -407,7 +414,7 @@ boolean USBGamePadDeviceConfigure (TUSBFunction *pUSBFunction)
                     pThis->m_pHIDReportDescriptor, pHIDDesc->wReportDescriptorLength)
         != pHIDDesc->wReportDescriptorLength)
     {
-        LogWrite (FromUSBPad, LOG_ERROR, "Cannot get HID report descriptor");
+        LogWrite (FromUSBPad, USPI_LOG_ERROR, "Cannot get HID report descriptor");
 
         return FALSE;
     }
@@ -426,7 +433,7 @@ boolean USBGamePadDeviceConfigure (TUSBFunction *pUSBFunction)
 
     if (!USBFunctionConfigure (&pThis->m_USBFunction))
     {
-        LogWrite (FromUSBPad, LOG_ERROR, "Cannot set interface");
+        LogWrite (FromUSBPad, USPI_LOG_ERROR, "Cannot set interface");
 
         return FALSE;
     }

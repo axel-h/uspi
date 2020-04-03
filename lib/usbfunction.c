@@ -35,7 +35,8 @@ void USBFunction (TUSBFunction *pThis, TUSBDevice *pDevice, TUSBConfigurationPar
 	pThis->m_pDevice = pDevice;
 	assert (pThis->m_pDevice != 0);
 
-	pThis->m_pConfigParser = (TUSBConfigurationParser *) malloc (sizeof (TUSBConfigurationParser));
+	// pThis->m_pConfigParser = (TUSBConfigurationParser *) malloc (sizeof (TUSBConfigurationParser));
+	pThis->m_pConfigParser = (TUSBConfigurationParser *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pConfigParser != 0);
 	assert (pConfigParser != 0);
 	USBConfigurationParserCopy (pThis->m_pConfigParser, pConfigParser);
@@ -54,7 +55,8 @@ void USBFunctionCopy (TUSBFunction *pThis, TUSBFunction *pFunction)
 	pThis->m_pDevice = pFunction->m_pDevice;
 	assert (pThis->m_pDevice != 0);
 
-	pThis->m_pConfigParser = (TUSBConfigurationParser *) malloc (sizeof (TUSBConfigurationParser));
+	// pThis->m_pConfigParser = (TUSBConfigurationParser *) malloc (sizeof (TUSBConfigurationParser));
+	pThis->m_pConfigParser = (TUSBConfigurationParser *)dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pConfigParser != 0);
 	assert (pFunction->m_pConfigParser != 0);
 	USBConfigurationParserCopy (pThis->m_pConfigParser, pFunction->m_pConfigParser);
@@ -70,7 +72,8 @@ void _USBFunction (TUSBFunction *pThis)
 	pThis->m_pInterfaceDesc = 0;
 
 	_USBConfigurationParser (pThis->m_pConfigParser);
-	free (pThis->m_pConfigParser);
+	// free (pThis->m_pConfigParser);
+	dma_free(pThis->m_pConfigParser, DMA_ALIGNEMENT);
 	pThis->m_pConfigParser = 0;
 
 	pThis->m_pDevice = 0;
@@ -90,7 +93,7 @@ boolean USBFunctionConfigure (TUSBFunction *pThis)
 						pThis->m_pInterfaceDesc->bAlternateSetting,
 						pThis->m_pInterfaceDesc->bInterfaceNumber, 0, 0) < 0)
 		{
-			LogWrite (FromUSBFunction, LOG_ERROR, "Cannot set interface");
+			LogWrite (FromUSBFunction, USPI_LOG_ERROR, "Cannot set interface");
 
 			return FALSE;
 		}

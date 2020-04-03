@@ -64,7 +64,8 @@ void USBKeyboardDevice (TUSBKeyboardDevice *pThis, TUSBFunction *pDevice)
 
 	KeyMap (&pThis->m_KeyMap);
 
-	pThis->m_pReportBuffer = malloc (BOOT_REPORT_SIZE);
+	//pThis->m_pReportBuffer = malloc (BOOT_REPORT_SIZE);
+	pThis->m_pReportBuffer = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 	assert (pThis->m_pReportBuffer != 0);
 }
 
@@ -74,14 +75,16 @@ void _CUSBKeyboardDevice (TUSBKeyboardDevice *pThis)
 
 	if (pThis->m_pReportBuffer != 0)
 	{
-		free (pThis->m_pReportBuffer);
+		//free (pThis->m_pReportBuffer);
+		dma_free(pThis->m_pReportBuffer, DMA_ALIGNEMENT);
 		pThis->m_pReportBuffer = 0;
 	}
 
 	if (pThis->m_pReportEndpoint != 0)
 	{
 		_USBEndpoint (pThis->m_pReportEndpoint);
-		free (pThis->m_pReportEndpoint);
+		//free (pThis->m_pReportEndpoint);
+		dma_free(pThis->m_pReportEndpoint, DMA_ALIGNEMENT);
 		pThis->m_pReportEndpoint = 0;
 	}
 
@@ -112,7 +115,8 @@ boolean USBKeyboardDeviceConfigure (TUSBFunction *pUSBFunction)
 		}
 
 		assert (pThis->m_pReportEndpoint == 0);
-		pThis->m_pReportEndpoint = malloc (sizeof (TUSBEndpoint));
+		//pThis->m_pReportEndpoint = malloc (sizeof (TUSBEndpoint));
+		pThis->m_pReportEndpoint = dma_alloc(DMA_PAGE_SIZE, DMA_ALIGNEMENT);
 		assert (pThis->m_pReportEndpoint != 0);
 		USBEndpoint2 (pThis->m_pReportEndpoint, USBFunctionGetDevice (&pThis->m_USBFunction), pEndpointDesc);
 
@@ -128,7 +132,7 @@ boolean USBKeyboardDeviceConfigure (TUSBFunction *pUSBFunction)
 	
 	if (!USBFunctionConfigure (&pThis->m_USBFunction))
 	{
-		LogWrite (FromUSBKbd, LOG_ERROR, "Cannot set interface");
+		LogWrite (FromUSBKbd, USPI_LOG_ERROR, "Cannot set interface");
 
 		return FALSE;
 	}
@@ -139,7 +143,7 @@ boolean USBKeyboardDeviceConfigure (TUSBFunction *pUSBFunction)
 				       SET_PROTOCOL, BOOT_PROTOCOL,
 				       USBFunctionGetInterfaceNumber (&pThis->m_USBFunction), 0, 0) < 0)
 	{
-		LogWrite (FromUSBKbd, LOG_ERROR, "Cannot set boot protocol");
+		LogWrite (FromUSBKbd, USPI_LOG_ERROR, "Cannot set boot protocol");
 
 		return FALSE;
 	}
@@ -210,7 +214,7 @@ void USBKeyboardDeviceSetLEDs (TUSBKeyboardDevice *pThis, u8 ucLEDMask)
 				       USBFunctionGetInterfaceNumber (&pThis->m_USBFunction),
 				       LEDs, sizeof LEDs) < 0)
 	{
-		LogWrite (FromUSBKbd, LOG_WARNING, "Cannot set LEDs");
+		LogWrite (FromUSBKbd, USPI_LOG_WARNING, "Cannot set LEDs");
 	}
 }
 
